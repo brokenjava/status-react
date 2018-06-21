@@ -1,6 +1,7 @@
 (ns status-im.ui.screens.wallet.choose-recipient.events
   (:require [status-im.constants :as constants]
             [status-im.i18n :as i18n]
+            [status-im.ui.screens.wallet.send.events :as send.events]
             [status-im.utils.ethereum.core :as ethereum]
             [status-im.utils.ethereum.eip681 :as eip681]
             [status-im.utils.handlers :as handlers]
@@ -36,8 +37,9 @@
         {:address s :chain-id chain-id})))
 
 ;; NOTE(janherich) - whenever changing assets, we want to clear the previusly set amount/amount-text
-(defn changed-asset [fx old-symbol new-symbol]
+(defn changed-asset [{:keys [db] :as fx} old-symbol new-symbol]
   (-> fx
+      (merge (send.events/update-gas-price db))
       (assoc-in [:db :wallet :send-transaction :amount] nil)
       (assoc-in [:db :wallet :send-transaction :amount-text] nil)
       (assoc-in [:db :wallet :send-transaction :asset-error]
@@ -54,8 +56,7 @@
 (handlers/register-handler-fx
  :wallet/fill-request-from-url
  (fn [{{:keys [network] :as db} :db} [_ data origin]]
-   (let [{:keys [view-id]}                      db
-         current-chain-id                       (get-in constants/default-networks [network :config :NetworkId])
+   (let [current-chain-id                       (get-in constants/default-networks [network :config :NetworkId])
          {:keys [address chain-id] :as details} (extract-details data current-chain-id)
          valid-network?                         (boolean (= current-chain-id chain-id))
          previous-state                         (get-in db [:wallet :send-transaction])
@@ -66,7 +67,6 @@
          new-gas                                (:gas details)]
      (cond-> {:db         db
               :dispatch   [:navigate-back]}
-       (and address (= :choose-recipient view-id)) (assoc :dispatch [:navigate-back])
        (and address valid-network?) (update :db #(fill-request-details % details))
        (and old-symbol new-symbol (not= old-symbol new-symbol)) (changed-asset old-symbol new-symbol)
        (and old-amount new-amount (not= old-amount new-amount)) (changed-amount-warning old-amount new-amount)
