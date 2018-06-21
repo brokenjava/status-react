@@ -6,7 +6,7 @@
 (defn handle-key-error [event {:keys [error key]}]
   (if (= :weak-key error)
     (log/warn "weak key used, database might not be encrypted properly")
-    (log/error "invalid key detected"))
+    (log/warn "invalid key detected"))
   (re-frame/dispatch (into [] (concat event [key error]))))
 
 (re-frame/reg-fx

@@ -223,11 +223,15 @@
  (fn [_ _]
    {:get-encryption-key [:initialize-app]}))
 
-(def handle-invalid-key-parameters
+(defn handle-invalid-key-parameters [encryption-key]
   {:title               (i18n/label :invalid-key-title)
    :content             (i18n/label :invalid-key-content)
    :confirm-button-text (i18n/label :invalid-key-confirm)
-   :on-cancel           #(.exitApp react/back-handler)
+   ;; On cancel we initialize the app with the invalid key, to allow the user
+   ;; to recover the seed phrase
+   :on-cancel           #(do
+                           (log/warn "initializing app with invalid key")
+                           (re-frame/dispatch [:initialize-app encryption-key]))
    :on-accept (fn []
                 (realm/delete-realms)
                 (.. (keychain/reset)
@@ -238,7 +242,7 @@
  :initialize-app
  (fn [_ [_ encryption-key error]]
    (if (= error :invalid-key)
-     {:show-confirmation handle-invalid-key-parameters}
+     {:show-confirmation (handle-invalid-key-parameters encryption-key)}
      {::init-device-UUID nil
       ::testfairy-alert  nil
       :dispatch-n        [[:initialize-db encryption-key]
